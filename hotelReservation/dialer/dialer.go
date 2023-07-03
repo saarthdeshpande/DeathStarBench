@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
+	"github.com/DivyanshuSaxena/grpc-opentracing/go/otgrpc"
 	"github.com/harlow/go-micro-services/tls"
 	consul "github.com/hashicorp/consul/api"
 	lb "github.com/olivere/grpc/lb/consul"
