@@ -29,11 +29,18 @@ type Server struct {
 	recommendationClient recommendation.RecommendationClient
 	userClient           user.UserClient
 	reservationClient    reservation.ReservationClient
-	KnativeDns           string
-	IpAddr               string
-	Port                 int
-	Tracer               opentracing.Tracer
-	Registry             *registry.Client
+
+	initSearch         bool
+	initProfile        bool
+	initRecommendation bool
+	initUser           bool
+	initRes            bool
+
+	KnativeDns string
+	IpAddr     string
+	Port       int
+	Tracer     opentracing.Tracer
+	Registry   *registry.Client
 }
 
 // Run the server
@@ -43,25 +50,31 @@ func (s *Server) Run() error {
 	}
 
 	log.Info().Msg("Initializing gRPC clients...")
-	if err := s.initSearchClient("srv-search"); err != nil {
-		return err
-	}
+	// if err := s.initSearchClient("srv-search"); err != nil {
+	// 	return err
+	// }
+	s.initSearch = false
 
-	if err := s.initProfileClient("srv-profile"); err != nil {
-		return err
-	}
+	// if err := s.initProfileClient("srv-profile"); err != nil {
+	// 	return err
+	// }
+	s.initProfile = false
 
-	if err := s.initRecommendationClient("srv-recommendation"); err != nil {
-		return err
-	}
+	// if err := s.initRecommendationClient("srv-recommendation"); err != nil {
+	// 	return err
+	// }
+	s.initRecommendation = false
 
-	if err := s.initUserClient("srv-user"); err != nil {
-		return err
-	}
+	// if err := s.initUserClient("srv-user"); err != nil {
+	// 	return err
+	// }
+	s.initUser = false
 
-	if err := s.initReservation("srv-reservation"); err != nil {
-		return err
-	}
+	// if err := s.initReservation("srv-reservation"); err != nil {
+	// 	return err
+	// }
+	s.initRes = false
+
 	log.Info().Msg("Successfull")
 
 	log.Trace().Msg("frontend before mux")
@@ -180,6 +193,12 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Trace().Msgf("SEARCH [lat: %v, lon: %v, inDate: %v, outDate: %v", lat, lon, inDate, outDate)
 	// search for best hotels
+	if !s.initSearch {
+		if err := s.initSearchClient("srv-search"); err != nil {
+			log.Trace().Msg("searchHandler initSearchClient failed")
+		}
+		s.initSearch = true
+	}
 	searchResp, err := s.searchClient.Nearby(ctx, &search.NearbyRequest{
 		Lat:     lat,
 		Lon:     lon,
@@ -202,6 +221,13 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		locale = "en"
 	}
 
+	// check availability
+	if !s.initRes {
+		if err := s.initReservation("srv-reservation"); err != nil {
+			log.Trace().Msg("searchHandler initReservation failed")
+		}
+		s.initRes = true
+	}
 	reservationResp, err := s.reservationClient.CheckAvailability(ctx, &reservation.Request{
 		CustomerName: "",
 		HotelId:      searchResp.HotelIds,
@@ -210,7 +236,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		RoomNumber:   1,
 	})
 	if err != nil {
-		log.Error().Msg("SearchHandler CheckAvailability failed")
+		log.Error().Msgf("SearchHandler CheckAvailability failed: %s", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -219,12 +245,18 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	log.Trace().Msgf("searchHandler gets reserveResp.HotelId = %s", reservationResp.HotelId)
 
 	// hotel profiles
+	if !s.initProfile {
+		if err := s.initProfileClient("srv-profile"); err != nil {
+			log.Trace().Msg("recommendHandler initProfileClient failed")
+		}
+		s.initProfile = true
+	}
 	profileResp, err := s.profileClient.GetProfiles(ctx, &profile.Request{
 		HotelIds: reservationResp.HotelId,
 		Locale:   locale,
 	})
 	if err != nil {
-		log.Error().Msg("SearchHandler GetProfiles failed")
+		log.Error().Msgf("SearchHandler GetProfiles failed: %s", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -255,6 +287,12 @@ func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// recommend hotels
+	if !s.initRecommendation {
+		if err := s.initRecommendationClient("srv-recommendation"); err != nil {
+			log.Trace().Msg("recommendHandler initRecommendationClient failed")
+		}
+		s.initRecommendation = true
+	}
 	recResp, err := s.recommendationClient.GetRecommendations(ctx, &recommendation.Request{
 		Require: require,
 		Lat:     float64(lat),
@@ -272,6 +310,12 @@ func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// hotel profiles
+	if !s.initProfile {
+		if err := s.initProfileClient("srv-profile"); err != nil {
+			log.Trace().Msg("recommendHandler initProfileClient failed")
+		}
+		s.initProfile = true
+	}
 	profileResp, err := s.profileClient.GetProfiles(ctx, &profile.Request{
 		HotelIds: recResp.HotelIds,
 		Locale:   locale,
@@ -295,6 +339,12 @@ func (s *Server) userHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check username and password
+	if !s.initUser {
+		if err := s.initUserClient("srv-user"); err != nil {
+			log.Trace().Msg("userHandler initUserClient failed")
+		}
+		s.initUser = true
+	}
 	recResp, err := s.userClient.CheckUser(ctx, &user.Request{
 		Username: username,
 		Password: password,
@@ -356,6 +406,12 @@ func (s *Server) reservationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check username and password
+	if !s.initUser {
+		if err := s.initUserClient("srv-user"); err != nil {
+			log.Trace().Msg("reservationHandler initUserClient failed")
+		}
+		s.initUser = true
+	}
 	recResp, err := s.userClient.CheckUser(ctx, &user.Request{
 		Username: username,
 		Password: password,
@@ -371,6 +427,12 @@ func (s *Server) reservationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Make reservation
+	if !s.initRes {
+		if err := s.initReservation("srv-reservation"); err != nil {
+			log.Trace().Msg("reservationHandler initReservation failed")
+		}
+		s.initRes = true
+	}
 	resResp, err := s.reservationClient.MakeReservation(ctx, &reservation.Request{
 		CustomerName: customerName,
 		HotelId:      []string{hotelId},

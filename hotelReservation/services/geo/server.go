@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/DivyanshuSaxena/grpc-opentracing/go/otgrpc"
+	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	"github.com/hailocab/go-geoindex"
 	"github.com/harlow/go-micro-services/registry"
 	pb "github.com/harlow/go-micro-services/services/geo/proto"
@@ -36,11 +36,11 @@ type Server struct {
 	index *geoindex.ClusteringIndex
 	uuid  string
 
-	Registry *registry.Client
-	Tracer   opentracing.Tracer
-	Port     int
-	IpAddr	 string
-	MongoSession 	*mgo.Session
+	Registry     *registry.Client
+	Tracer       opentracing.Tracer
+	Port         int
+	IpAddr       string
+	MongoSession *mgo.Session
 }
 
 // Run starts the server

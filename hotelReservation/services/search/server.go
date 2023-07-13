@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/DivyanshuSaxena/grpc-opentracing/go/otgrpc"
+	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	"github.com/harlow/go-micro-services/dialer"
 	"github.com/harlow/go-micro-services/registry"
 	geo "github.com/harlow/go-micro-services/services/geo/proto"
@@ -29,6 +29,8 @@ const name = "srv-search"
 
 // Server implments the search service
 type Server struct {
+	geoInit    bool
+	rateInit   bool
 	geoClient  geo.GeoClient
 	rateClient rate.RateClient
 
@@ -67,13 +69,15 @@ func (s *Server) Run() error {
 	srv := grpc.NewServer(opts...)
 	pb.RegisterSearchServer(srv, s)
 
-	// init grpc clients
-	if err := s.initGeoClient("srv-geo"); err != nil {
-		return err
-	}
-	if err := s.initRateClient("srv-rate"); err != nil {
-		return err
-	}
+	// init grpc clients -- Changed: On demand initialization
+	// if err := s.initGeoClient("srv-geo"); err != nil {
+	// 	return err
+	// }
+	// if err := s.initRateClient("srv-rate"); err != nil {
+	// 	return err
+	// }
+	s.geoInit = false
+	s.rateInit = false
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
@@ -147,6 +151,12 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchR
 	log.Trace().Msgf("nearby lat = %f", req.Lat)
 	log.Trace().Msgf("nearby lon = %f", req.Lon)
 
+	if !s.geoInit {
+		if err := s.initGeoClient("srv-geo"); err != nil {
+			return nil, err
+		}
+		s.geoInit = true
+	}
 	nearby, err := s.geoClient.Nearby(ctx, &geo.Request{
 		Lat: req.Lat,
 		Lon: req.Lon,
@@ -160,6 +170,12 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchR
 	}
 
 	// find rates for hotels
+	if !s.rateInit {
+		if err := s.initRateClient("srv-rate"); err != nil {
+			return nil, err
+		}
+		s.rateInit = true
+	}
 	rates, err := s.rateClient.GetRates(ctx, &rate.Request{
 		HotelIds: nearby.HotelIds,
 		InDate:   req.InDate,

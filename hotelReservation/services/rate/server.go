@@ -11,13 +11,13 @@ import (
 	"net"
 	// "os"
 	"sort"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/google/uuid"
-	"github.com/DivyanshuSaxena/grpc-opentracing/go/otgrpc"
+	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 	"github.com/harlow/go-micro-services/registry"
 	pb "github.com/harlow/go-micro-services/services/rate/proto"
 	"github.com/harlow/go-micro-services/tls"
