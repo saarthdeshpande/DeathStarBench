@@ -33,7 +33,7 @@ spec:
             - containerPort: 27017
           resources:
             requests:
-              cpu: 1000m
+              cpu: 750m
             limits:
               cpu: 1500m
           volumeMounts:
