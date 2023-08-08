@@ -33,13 +33,13 @@ spec:
             - containerPort: 27017
           resources:
             requests:
-              cpu: 750m
+              cpu: 2000m
             limits:
-              cpu: 1500m
+              cpu: 4000m
           volumeMounts:
             - mountPath: /data/db
               name: profile
-        - image: divyanshus/copper:latest
+        - image: divyanshus/copper:non-init
           name: sidecar-bridge
           env:
           - name: RUST_LOG
@@ -55,7 +55,7 @@ spec:
                 SYS_ADMIN
           command: ["ebpf-bridge"]
           args: ["driver", "--config", "/configs/ebpf-bridge-config.yaml"]
-        - image: divyanshus/copper:latest
+        - image: divyanshus/copper:non-init
           name: sidecar
           env:
           - name: RUST_LOG
