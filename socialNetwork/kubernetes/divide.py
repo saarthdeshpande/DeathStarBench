@@ -23,9 +23,14 @@ for i in range(len(lines)):
     
         # Open a new file
         dirname = lines[i+1].split('/')[2].lower()
-        filename = lines[i+1].split('/')[4].lower()
+        bad_filename = lines[i+1].split('/')[4].lower()
+        filename = lines[i+1].split('/')[4].lower().strip()
         if dirname not in dirs:
             dirs.append(dirname)
+
+        # Remove the file dirname/bad_filename
+        if os.path.exists(os.path.join(os.getcwd(), dirname + '/' + bad_filename)):
+            os.remove(os.path.join(os.getcwd(), dirname + '/' + bad_filename))
 
         # Create the directory if it doesn't exist
         if not os.path.exists(os.path.join(os.getcwd(), dirname)):
