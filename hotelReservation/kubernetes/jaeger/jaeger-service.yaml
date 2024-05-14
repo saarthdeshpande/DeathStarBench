@@ -25,6 +25,9 @@ spec:
     - name: "16686"
       port: 16686
       targetPort: 16686
+    - name: "16685"
+      port: 16685
+      targetPort: 16685
     - name: "5775"
       port: 5775
       protocol: UDP

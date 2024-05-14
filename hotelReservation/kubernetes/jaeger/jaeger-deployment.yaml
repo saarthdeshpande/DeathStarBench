@@ -33,6 +33,7 @@ spec:
             - containerPort: 5778
             - containerPort: 14268
             - containerPort: 14267
+            - containerPort: 16685
             - containerPort: 16686
             - containerPort: 5775
               protocol: UDP
