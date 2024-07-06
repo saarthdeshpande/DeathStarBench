@@ -26,6 +26,7 @@ spec:
         - containerPort: 6831
         - containerPort: 6832
         - containerPort: 5778
+        - containerPort: 16685
         - containerPort: 16686
         - containerPort: 14268
         - containerPort: 9411

@@ -22,6 +22,9 @@ spec:
   - name: "5778"
     port: 5778
     targetPort: 5778
+  - name: "16685"
+    port: 16685
+    targetPort: 16685
   - name: "16686"
     port: 16686
     targetPort: 16686
