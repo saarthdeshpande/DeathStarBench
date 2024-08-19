@@ -38,6 +38,11 @@ static struct {
     pthread_mutex_t mutex;
 } statistics;
 
+struct logging_args {
+    uint64_t num_threads;
+    uint64_t cancel;
+    thread *threads;
+};
 
 static struct sock sock = {
     .connect  = sock_connect,
@@ -103,6 +108,10 @@ int main(int argc, char **argv) {
     uint64_t connections = cfg.connections / cfg.threads;
     uint64_t throughput = cfg.rate / cfg.threads;
     char *time = format_time_s(cfg.duration);
+
+    /*additional variables for logging thread*/
+    pthread_t logging_thread;
+    struct logging_args args;
 
     lua_State **L = zmalloc(cfg.num_urls * sizeof(lua_State *));
     pthread_mutex_init(&statistics.mutex, NULL);
@@ -209,6 +218,12 @@ int main(int argc, char **argv) {
         start_urls[id_url] = time_us();
 
     }
+
+    /*create and start the logging thread*/
+    args.num_threads = cfg.num_urls * cfg.threads;
+    args.cancel = 0;
+    args.threads = threads;
+    pthread_create(&logging_thread, NULL, &logging, &args);
     
     struct sigaction sa = {
         .sa_handler = handler,
@@ -232,6 +247,10 @@ int main(int argc, char **argv) {
         // timer
         runtime_us[id_url] = time_us() -start_urls[id_url];
     }
+
+    // All threads have joined - send cancel signal and wait for logging thread as well.
+    args.cancel = 1;
+    pthread_join(logging_thread, NULL);
     
     uint64_t end = time_us();
     uint64_t total_runtime_us = end - start_urls[0];
@@ -379,6 +398,45 @@ int main(int argc, char **argv) {
         printf("Transfer/sec: %10sB\n", format_binary(total_bytes_per_s));
     }
     return 0;
+}
+
+void *logging(void *args) {
+    struct logging_args *arg = args;
+    uint64_t num_threads = arg->num_threads;
+    thread *threads = arg->threads;
+    uint64_t cancel = arg->cancel;
+    
+    struct hdr_histogram* log_latency_histogram;
+    hdr_init(1, MAX_LATENCY, 3, &log_latency_histogram);
+
+    // Every LOG_INTERVAL_SEC, iterate over all threads and get the histograms.
+    while(cancel != 1) {
+        // Check for cancel signal every ten seconds, and break if set.
+        uint32_t sleep_time = 0;
+        while (sleep_time < LOG_INTERVAL_SEC) {
+            sleep(10);
+            sleep_time += 10;
+            cancel = arg->cancel;
+            if (cancel == 1) {
+                break;
+            }
+        }
+
+        if (cancel != 1) {
+            hdr_reset(log_latency_histogram);
+            for(uint64_t t_id = 0; t_id < num_threads; t_id++) {
+                thread* t = &threads[t_id];
+                hdr_add(log_latency_histogram, t->latency_histogram);
+            }
+
+            print_hdr_latency(log_latency_histogram,
+                    "Checkpointed Latency");
+            printf("-----------------------------------------------------------------------\n");
+        }
+    }
+
+    printf("Logging function completed.\n");
+    return NULL;
 }
 
 void *thread_main(void *arg) {
