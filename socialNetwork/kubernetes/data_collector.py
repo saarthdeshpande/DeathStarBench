@@ -46,7 +46,7 @@ def create_hpa_yaml(args):
         for fn in glob.glob(f"{folder}/*.yaml"):
             with open(fn) as f:
                 docs = list(yaml.safe_load_all(f))
-            if fn.endswith('deployment.yaml'):# and 'mongodb' not in fn:
+            if fn.endswith('deployment.yaml') and 'mongodb' not in fn:
                 # if 'home-timeline' in fn or 'nginx' in fn:
                 #     pMin, pMax = 1, 10
                 # else:
@@ -222,7 +222,7 @@ def main():
         # wrk2Cmd = f"/usr/local/bin/wrk -t4 -c100 -d{args.time} -R500 -s {wrk2file_path} http://{frontend_ip} -- {metric}"
         print("Applying wrk. Sleeping for 60s.")
         # TODO: configure number of threads and T* number of rps entries
-        command = shlex.split(f'wrk -t1 -c1000 -d{args.time} -R6000 -s {wrk2file_path} http://{frontend_ip}')
+        command = shlex.split(f'wrk -t1 -c50 -d{args.time} -R500 -s {wrk2file_path} http://{frontend_ip}')
         wrk2Process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(60)
         print("Wrk process completed.")

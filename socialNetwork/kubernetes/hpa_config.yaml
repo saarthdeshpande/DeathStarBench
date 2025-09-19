@@ -60,7 +60,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: post-storage-memcached
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -373,13 +373,6 @@ spec:
         name: user-mongodb
         ports:
         - containerPort: 27017
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 256Mi
-          requests:
-            cpu: 500m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /social-network-microservices/config/mongod.conf
           name: user-mongodb-config
@@ -390,31 +383,6 @@ spec:
       - configMap:
           name: user-mongodb
         name: user-mongodb-config
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: user-mongodb
-spec:
-  maxReplicas: 5
-  metrics:
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  minReplicas: 1
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: user-mongodb
 ---
 apiVersion: v1
 data:
@@ -492,7 +460,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: text-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -828,7 +796,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: user-memcached
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -1166,7 +1134,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: unique-id-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -1536,7 +1504,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: jaeger
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -1849,13 +1817,6 @@ spec:
         name: post-storage-mongodb
         ports:
         - containerPort: 27017
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 256Mi
-          requests:
-            cpu: 500m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /social-network-microservices/config/mongod.conf
           name: post-storage-mongodb-config
@@ -1866,31 +1827,6 @@ spec:
       - configMap:
           name: post-storage-mongodb
         name: post-storage-mongodb-config
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: post-storage-mongodb
-spec:
-  maxReplicas: 5
-  metrics:
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  minReplicas: 1
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: post-storage-mongodb
 ---
 apiVersion: v1
 data:
@@ -2017,7 +1953,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: nginx-thrift
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -2054,7 +1990,7 @@ data:
         "param": 0.01
       }
     }
-  nginx.conf: "# Load the OpenTracing dynamic module.\nload_module modules/ngx_http_opentracing_module.so;\n\n# Checklist: Make sure that worker_processes == #cores you gave to\n# nginx process\nworker_processes  auto;\n\n# error_log  logs/error.log;\n\n# Checklist: Make sure that worker_connections * worker_processes\n# is greater than the total connections between the client and Nginx. \nevents {\n  use epoll;\n  worker_connections  1024;\n}\n\nenv fqdn_suffix;\n\nhttp {\n  # Load a vendor tracer\n  opentracing on;\n  opentracing_load_tracer /usr/local/lib/libjaegertracing_plugin.so /usr/local/openresty/nginx/jaeger-config.json;\n\n  include       mime.types;\n  default_type  application/octet-stream;\n\n  proxy_read_timeout 5000;\n  proxy_connect_timeout 5000;\n  proxy_send_timeout 5000;\n  \n  log_format main '$remote_addr - $remote_user [$time_local] \"$request\"'\n                  '$status $body_bytes_sent \"$http_referer\" '\n                  '\"$http_user_agent\" \"$http_x_forwarded_for\"';\n  # access_log  logs/access.log  main;\n\n  sendfile        on;\n  tcp_nopush      on;\n  tcp_nodelay     on;\n\n  # Checklist: Make sure the keepalive_timeout is greateer than\n  # the duration of your experiment and keepalive_requests\n  # is greateer than the total number of requests sent from\n  # the workload generator\n  keepalive_timeout  120s;\n  keepalive_requests 100000;\n\n  # Docker default hostname resolver. Set valid timeout to prevent unlimited\n  # ttl for resolver caching.\n  # resolver 127.0.0.11 valid=10s ipv6=off;\n  resolver kube-dns.kube-system.svc.cluster.local valid=10s ipv6=off;\n\n  lua_package_path '/usr/local/openresty/nginx/lua-scripts/?.lua;/usr/local/openresty/luajit/share/lua/5.1/?.lua;;';\n\n  lua_shared_dict config 32k;\n\n  init_by_lua_block {\n    local bridge_tracer = require \"opentracing_bridge_tracer\"\n    local GenericObjectPool = require \"GenericObjectPool\"\n    local ngx = ngx\n    local jwt = require \"resty.jwt\"\n    local cjson = require 'cjson'\n\n    local social_network_UserTimelineService = require 'social_network_UserTimelineService'\n    local UserTimelineServiceClient = social_network_UserTimelineService.social_network_UserTimelineService\n    local social_network_SocialGraphService = require 'social_network_SocialGraphService'\n    local SocialGraphServiceClient = social_network_SocialGraphService.SocialGraphServiceClient\n    local social_network_ComposePostService = require 'social_network_ComposePostService'\n    local ComposePostServiceClient = social_network_ComposePostService.ComposePostServiceClient\n    local social_network_UserService = require 'social_network_UserService'\n    local UserServiceClient = social_network_UserService.UserServiceClient\n\n\n    local config = ngx.shared.config;\n    config:set(\"secret\", \"secret\")\n    config:set(\"cookie_ttl\", 3600 * 24)\n    config:set(\"ssl\", false)\n  }\n\n  server {\n\n    # Checklist: Set up the port that nginx listens to.\n    listen       8080 reuseport;\n    server_name  localhost;\n\n    # Checklist: Turn of the access_log and error_log if you\n    # don't need them.\n    access_log  off;\n    # error_log off;\n\n    lua_need_request_body on;\n\n    # Used when SSL enabled\n    lua_ssl_trusted_certificate /keys/CA.pem;\n    lua_ssl_ciphers ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH;\n\n    # Checklist: Make sure that the location here is consistent\n    # with the location you specified in wrk2.\n    location /api/user/register {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain; charset=utf-8';\n            add_header 'Content-Length' 0;\n            return 204;\n          }\n          if ($request_method = 'POST') {\n            add_header\
+  nginx.conf: "# Load the OpenTracing dynamic module.\nload_module modules/ngx_http_opentracing_module.so;\n\n# Checklist: Make sure that worker_processes == #cores you gave to\n# nginx process\nworker_processes  auto;\n\n# error_log  logs/error.log;\n\n# Checklist: Make sure that worker_connections * worker_processes\n# is greater than the total connections between the client and Nginx. \nevents {\n  use epoll;\n  worker_connections  1024;\n}\n\nenv fqdn_suffix;\n\nhttp {\n  # Load a vendor tracer\n  opentracing on;\n  opentracing_load_tracer /usr/local/lib/libjaegertracing_plugin.so /usr/local/openresty/nginx/jaeger-config.json;\n\n  include       mime.types;\n  default_type  application/octet-stream;\n\n  proxy_read_timeout 5000;\n  proxy_connect_timeout 5000;\n  proxy_send_timeout 5000;\n  \n  log_format main '$remote_addr - $remote_user [$time_local] \"$request\"'\n                  '$status $body_bytes_sent \"$http_referer\" '\n                  '\"$http_user_agent\" \"$http_x_forwarded_for\"';\n  # access_log  logs/access.log  main;\n\n  sendfile        on;\n  tcp_nopush      on;\n  tcp_nodelay     on;\n\n  # Checklist: Make sure the keepalive_timeout is greateer than\n  # the duration of your experiment and keepalive_requests\n  # is greateer than the total number of requests sent from\n  # the workload generator\n  keepalive_timeout  9h;\n  keepalive_requests 1000000;\n\n  # Docker default hostname resolver. Set valid timeout to prevent unlimited\n  # ttl for resolver caching.\n  # resolver 127.0.0.11 valid=10s ipv6=off;\n  resolver kube-dns.kube-system.svc.cluster.local valid=10s ipv6=off;\n\n  lua_package_path '/usr/local/openresty/nginx/lua-scripts/?.lua;/usr/local/openresty/luajit/share/lua/5.1/?.lua;;';\n\n  lua_shared_dict config 32k;\n\n  init_by_lua_block {\n    local bridge_tracer = require \"opentracing_bridge_tracer\"\n    local GenericObjectPool = require \"GenericObjectPool\"\n    local ngx = ngx\n    local jwt = require \"resty.jwt\"\n    local cjson = require 'cjson'\n\n    local social_network_UserTimelineService = require 'social_network_UserTimelineService'\n    local UserTimelineServiceClient = social_network_UserTimelineService.social_network_UserTimelineService\n    local social_network_SocialGraphService = require 'social_network_SocialGraphService'\n    local SocialGraphServiceClient = social_network_SocialGraphService.SocialGraphServiceClient\n    local social_network_ComposePostService = require 'social_network_ComposePostService'\n    local ComposePostServiceClient = social_network_ComposePostService.ComposePostServiceClient\n    local social_network_UserService = require 'social_network_UserService'\n    local UserServiceClient = social_network_UserService.UserServiceClient\n\n\n    local config = ngx.shared.config;\n    config:set(\"secret\", \"secret\")\n    config:set(\"cookie_ttl\", 3600 * 24)\n    config:set(\"ssl\", false)\n  }\n\n  server {\n\n    # Checklist: Set up the port that nginx listens to.\n    listen       8080 reuseport;\n    server_name  localhost;\n\n    # Checklist: Turn of the access_log and error_log if you\n    # don't need them.\n    access_log  off;\n    # error_log off;\n\n    lua_need_request_body on;\n\n    # Used when SSL enabled\n    lua_ssl_trusted_certificate /keys/CA.pem;\n    lua_ssl_ciphers ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH;\n\n    # Checklist: Make sure that the location here is consistent\n    # with the location you specified in wrk2.\n    location /api/user/register {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain; charset=utf-8';\n            add_header 'Content-Length' 0;\n            return 204;\n          }\n          if ($request_method = 'POST') {\n            add_header\
     \ 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n          if ($request_method = 'GET') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n      content_by_lua '\n          local client = require \"api/user/register\"\n          client.RegisterUser();\n      ';\n    }\n\n    location /api/user/follow {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain; charset=utf-8';\n            add_header 'Content-Length' 0;\n            return 204;\n          }\n          if ($request_method = 'POST') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n          if ($request_method = 'GET') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n      content_by_lua '\n          local client = require \"api/user/follow\"\n          client.Follow();\n      ';\n    }\n\n    location /api/user/unfollow {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain; charset=utf-8';\n            add_header 'Content-Length' 0;\n            return 204;\n          }\n          if ($request_method = 'POST') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n          if ($request_method = 'GET') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n      content_by_lua '\n          local client = require \"api/user/unfollow\"\n          client.Unfollow();\n      ';\n    }\n\n    location /api/user/login {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin'\
     \ '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain; charset=utf-8';\n            add_header 'Content-Length' 0;\n            return 204;\n          }\n          if ($request_method = 'POST') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n          if ($request_method = 'GET') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n      content_by_lua '\n          local client = require \"api/user/login\"\n          client.Login();\n      ';\n    }\n\n    location /api/post/compose {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain; charset=utf-8';\n            add_header 'Content-Length' 0;\n            return 204;\n          }\n          if ($request_method = 'POST') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n          if ($request_method = 'GET') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n      content_by_lua '\n          local client = require \"api/post/compose\"\n          client.ComposePost();\n      ';\n    }\n\n    location /api/user-timeline/read {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain; charset=utf-8';\n            add_header 'Content-Length' 0;\n            return 204;\n          }\n          if ($request_method = 'POST') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n          if ($request_method = 'GET') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST,\
     \ OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n          }\n      content_by_lua '\n          local client = require \"api/user-timeline/read\"\n          client.ReadUserTimeline();\n      ';\n    }\n\n    location /api/home-timeline/read {\n            if ($request_method = 'OPTIONS') {\n              add_header 'Access-Control-Allow-Origin' '*';\n              add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n              add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n              add_header 'Access-Control-Max-Age' 1728000;\n              add_header 'Content-Type' 'text/plain; charset=utf-8';\n              add_header 'Content-Length' 0;\n              return 204;\n            }\n            if ($request_method = 'POST') {\n              add_header 'Access-Control-Allow-Origin' '*';\n              add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n              add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n              add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n            }\n            if ($request_method = 'GET') {\n              add_header 'Access-Control-Allow-Origin' '*';\n              add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n              add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n              add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n            }\n      content_by_lua '\n          local client = require \"api/home-timeline/read\"\n          client.ReadHomeTimeline();\n      ';\n    }\n\n    # # get userinfo lua\n    # location /api/user/user_info {\n    #       if ($request_method = 'OPTIONS') {\n    #         add_header 'Access-Control-Allow-Origin' '*';\n    #         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n    #         add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n    #         add_header 'Access-Control-Max-Age' 1728000;\n    #         add_header 'Content-Type' 'text/plain; charset=utf-8';\n    #         add_header 'Content-Length' 0;\n    #         return 204;\n    #       }\n    #       if ($request_method = 'POST') {\n    #         add_header 'Access-Control-Allow-Origin' '*';\n    #         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n    #         add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n    #         add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n    #       }\n    #       if ($request_method = 'GET') {\n    #         add_header 'Access-Control-Allow-Origin' '*';\n    #         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n    #         add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n    #         add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';\n    #       }\n    #   content_by_lua '\n    #       local client = require \"api/user/user_info\"\n    #       client.UserInfo();\n    #   ';\n    # }\n    # get follower lua\n    location /api/user/get_follower {\n          if ($request_method = 'OPTIONS') {\n            add_header 'Access-Control-Allow-Origin' '*';\n            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';\n            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';\n            add_header 'Access-Control-Max-Age' 1728000;\n            add_header 'Content-Type' 'text/plain;\
@@ -2130,7 +2066,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: media-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -2468,7 +2404,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: user-timeline-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -2806,7 +2742,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: compose-post-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -3119,13 +3055,6 @@ spec:
         name: social-graph-mongodb
         ports:
         - containerPort: 27017
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 256Mi
-          requests:
-            cpu: 500m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /social-network-microservices/config/mongod.conf
           name: social-graph-mongodb-config
@@ -3136,31 +3065,6 @@ spec:
       - configMap:
           name: social-graph-mongodb
         name: social-graph-mongodb-config
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: social-graph-mongodb
-spec:
-  maxReplicas: 5
-  metrics:
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  minReplicas: 1
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: social-graph-mongodb
 ---
 apiVersion: v1
 data:
@@ -3238,7 +3142,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: user-mention-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -3551,13 +3455,6 @@ spec:
         name: media-mongodb
         ports:
         - containerPort: 27017
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 256Mi
-          requests:
-            cpu: 500m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /social-network-microservices/config/mongod.conf
           name: media-mongodb-config
@@ -3568,31 +3465,6 @@ spec:
       - configMap:
           name: media-mongodb
         name: media-mongodb-config
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: media-mongodb
-spec:
-  maxReplicas: 5
-  metrics:
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  minReplicas: 1
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: media-mongodb
 ---
 apiVersion: v1
 data:
@@ -3667,7 +3539,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: home-timeline-redis
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -3766,7 +3638,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: social-graph-redis
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -3866,7 +3738,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: url-shorten-memcached
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -4204,7 +4076,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: url-shorten-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -4542,7 +4414,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: social-graph-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -4880,7 +4752,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: user-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -5245,7 +5117,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: media-frontend
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -5704,7 +5576,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: user-timeline-redis
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -5781,13 +5653,6 @@ spec:
         name: url-shorten-mongodb
         ports:
         - containerPort: 27017
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 256Mi
-          requests:
-            cpu: 500m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /social-network-microservices/config/mongod.conf
           name: url-shorten-mongodb-config
@@ -5798,31 +5663,6 @@ spec:
       - configMap:
           name: url-shorten-mongodb
         name: url-shorten-mongodb-config
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: url-shorten-mongodb
-spec:
-  maxReplicas: 5
-  metrics:
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  minReplicas: 1
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: url-shorten-mongodb
 ---
 apiVersion: v1
 data:
@@ -5898,7 +5738,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: media-memcached
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -6236,7 +6076,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: home-timeline-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
@@ -6549,13 +6389,6 @@ spec:
         name: user-timeline-mongodb
         ports:
         - containerPort: 27017
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 256Mi
-          requests:
-            cpu: 500m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /social-network-microservices/config/mongod.conf
           name: user-timeline-mongodb-config
@@ -6566,31 +6399,6 @@ spec:
       - configMap:
           name: user-timeline-mongodb
         name: user-timeline-mongodb-config
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: user-timeline-mongodb
-spec:
-  maxReplicas: 5
-  metrics:
-  - resource:
-      name: cpu
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  - resource:
-      name: memory
-      target:
-        averageUtilization: 50
-        type: Utilization
-    type: Resource
-  minReplicas: 1
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: user-timeline-mongodb
 ---
 apiVersion: v1
 data:
@@ -6668,7 +6476,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: post-storage-service
 spec:
-  maxReplicas: 5
+  maxReplicas: 3
   metrics:
   - resource:
       name: cpu
